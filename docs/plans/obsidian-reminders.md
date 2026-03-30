@@ -12,11 +12,11 @@ Build a Go Telegram bot (r2d2) that reads tasks from an Obsidian vault, parses Y
 
 ### Task 1: Initialize project and CLI entry point
 
-* [ ] Create Go module `r2d2`
-* [ ] Create directories `cmd/r2d2`, `internal/config`, `internal/obsidian`, `internal/scheduler`, `internal/telegram`, `internal/reminder`
-* [ ] Implement `main.go` that loads config and starts the bot
-* [ ] Add tests
-* [ ] Mark completed
+* [x] Create Go module `r2d2`
+* [x] Create directories `cmd/r2d2`, `internal/config`, `internal/obsidian`, `internal/scheduler`, `internal/telegram`, `internal/reminder`
+* [x] Implement `main.go` that loads config and starts the bot
+* [x] Add tests
+* [x] Mark completed
 
 ### Task 2: Implement JSON config loading
 
