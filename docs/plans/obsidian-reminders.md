@@ -29,15 +29,15 @@ Build a Go Telegram bot (r2d2) that reads tasks from an Obsidian vault, parses Y
 
 ### Task 3: Implement Obsidian vault scanner
 
-* [ ] Recursively scan `vault_path` for `.md` files
-* [ ] Parse YAML frontmatter between `---` delimiters using `gopkg.in/yaml.v3`
-* [ ] Extract fields: `type`, `status`, `due`, `priority`, `project`
-* [ ] Filter: only `type: Task`, status in configured `reminder_statuses`
-* [ ] Filter: only tasks where `due` is set
-* [ ] Parse `due` as `YYYY-MM-DD` (date-only) or `YYYY-MM-DDTHH:mm` (datetime)
-* [ ] Return list of `Task` structs with: title (from filename), due (time.Time), has_time (bool), priority, project, file_path
-* [ ] Add tests with sample frontmatter files
-* [ ] Mark completed
+* [x] Recursively scan `vault_path` for `.md` files
+* [x] Parse YAML frontmatter between `---` delimiters using `gopkg.in/yaml.v3`
+* [x] Extract fields: `type`, `status`, `due`, `priority`, `project`
+* [x] Filter: only `type: Task`, status in configured `reminder_statuses`
+* [x] Filter: only tasks where `due` is set
+* [x] Parse `due` as `YYYY-MM-DD` (date-only) or `YYYY-MM-DDTHH:mm` (datetime)
+* [x] Return list of `Task` structs with: title (from filename), due (time.Time), has_time (bool), priority, project, file_path
+* [x] Add tests with sample frontmatter files
+* [x] Mark completed
 
 ### Task 4: Implement Telegram client
 
