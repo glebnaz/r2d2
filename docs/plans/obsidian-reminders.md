@@ -50,15 +50,15 @@ Build a Go Telegram bot (r2d2) that reads tasks from an Obsidian vault, parses Y
 
 ### Task 5: Implement reminder scheduler
 
-* [ ] On startup, scan vault and build schedule for today's tasks
-* [ ] For date-only tasks: schedule reminder at `morning_hour` (default 09:00)
-* [ ] For datetime tasks: schedule reminder at the specified time
-* [ ] Skip tasks whose reminder time has already passed today
-* [ ] Re-scan vault periodically (every `scan_interval_minutes`) to pick up new/changed tasks
-* [ ] At midnight, rebuild the full schedule for the new day
-* [ ] Track sent reminders (in-memory set by file_path + date) to avoid duplicates
-* [ ] Add tests
-* [ ] Mark completed
+* [x] On startup, scan vault and build schedule for today's tasks
+* [x] For date-only tasks: schedule reminder at `morning_hour` (default 09:00)
+* [x] For datetime tasks: schedule reminder at the specified time
+* [x] Skip tasks whose reminder time has already passed today
+* [x] Re-scan vault periodically (every `scan_interval_minutes`) to pick up new/changed tasks
+* [x] At midnight, rebuild the full schedule for the new day
+* [x] Track sent reminders (in-memory set by file_path + date) to avoid duplicates
+* [x] Add tests
+* [x] Mark completed
 
 ### Task 6: Format reminder messages
 
