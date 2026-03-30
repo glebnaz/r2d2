@@ -20,12 +20,12 @@ Build a Go Telegram bot (r2d2) that reads tasks from an Obsidian vault, parses Y
 
 ### Task 2: Implement JSON config loading
 
-* [ ] Define config struct with fields: `vault_path`, `telegram_token`, `telegram_chat_id`, `timezone` (default `Europe/Moscow`), `morning_hour` (default 9), `scan_interval_minutes` (default 5), `reminder_statuses` (default `["todo","in-progress","block"]`)
-* [ ] Set default config path `~/.config/r2d2/config.json`
-* [ ] Accept config path override via `--config` flag
-* [ ] Validate required fields (`vault_path`, `telegram_token`, `telegram_chat_id`)
-* [ ] Add tests
-* [ ] Mark completed
+* [x] Define config struct with fields: `vault_path`, `telegram_token`, `telegram_chat_id`, `timezone` (default `Europe/Moscow`), `morning_hour` (default 9), `scan_interval_minutes` (default 5), `reminder_statuses` (default `["todo","in-progress","block"]`)
+* [x] Set default config path `~/.config/r2d2/config.json`
+* [x] Accept config path override via `--config` flag
+* [x] Validate required fields (`vault_path`, `telegram_token`, `telegram_chat_id`)
+* [x] Add tests
+* [x] Mark completed
 
 ### Task 3: Implement Obsidian vault scanner
 
