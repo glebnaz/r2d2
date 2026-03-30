@@ -41,12 +41,12 @@ Build a Go Telegram bot (r2d2) that reads tasks from an Obsidian vault, parses Y
 
 ### Task 4: Implement Telegram client
 
-* [ ] Use `go-telegram-bot-api/telegram-bot-api` library with long polling
-* [ ] Implement `SendMessage(chatID, text)` with Markdown formatting
-* [ ] Implement bot startup and graceful shutdown
-* [ ] Handle connection errors with retry and logging
-* [ ] Add tests using mock HTTP server
-* [ ] Mark completed
+* [x] Use `go-telegram-bot-api/telegram-bot-api` library with long polling
+* [x] Implement `SendMessage(chatID, text)` with Markdown formatting
+* [x] Implement bot startup and graceful shutdown
+* [x] Handle connection errors with retry and logging
+* [x] Add tests using mock HTTP server
+* [x] Mark completed
 
 ### Task 5: Implement reminder scheduler
 
