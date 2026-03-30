@@ -62,13 +62,13 @@ Build a Go Telegram bot (r2d2) that reads tasks from an Obsidian vault, parses Y
 
 ### Task 6: Format reminder messages
 
-* [ ] Morning digest: group all date-only tasks due today into one message, sorted by priority (high first)
-* [ ] Include task title, priority (if set), project (if set)
-* [ ] Timed reminders: send individual message per task at its scheduled time
-* [ ] Overdue tasks: include in morning digest with "overdue" label if `due < today`
-* [ ] Use Telegram Markdown formatting for readability
-* [ ] Add tests
-* [ ] Mark completed
+* [x] Morning digest: group all date-only tasks due today into one message, sorted by priority (high first)
+* [x] Include task title, priority (if set), project (if set)
+* [x] Timed reminders: send individual message per task at its scheduled time
+* [x] Overdue tasks: include in morning digest with "overdue" label if `due < today`
+* [x] Use Telegram Markdown formatting for readability
+* [x] Add tests
+* [x] Mark completed
 
 ### Task 7: Wire everything together and add graceful shutdown
 
