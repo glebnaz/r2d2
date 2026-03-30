@@ -1,26 +1,111 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"r2d2/internal/config"
+	"r2d2/internal/obsidian"
+	"r2d2/internal/reminder"
+	"r2d2/internal/scheduler"
+	"r2d2/internal/telegram"
 )
 
-func main() {
+// dryRunSender prints messages to stdout instead of sending via Telegram.
+type dryRunSender struct{}
+
+func (d *dryRunSender) SendMessage(_ context.Context, text string) error {
+	fmt.Println("--- DRY RUN ---")
+	fmt.Println(text)
+	fmt.Println("--- END ---")
+	return nil
+}
+
+func run() error {
 	configPath := flag.String("config", "", "path to config file")
 	dryRun := flag.Bool("dry-run", false, "print reminders to stdout instead of sending via Telegram")
 	flag.Parse()
 
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+	slog.SetDefault(logger)
+
 	cfg, err := config.Load(*configPath)
 	if err != nil {
-		slog.Error("failed to load config", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("loading config: %w", err)
 	}
 
-	_ = dryRun
+	loc, err := time.LoadLocation(cfg.Timezone)
+	if err != nil {
+		return fmt.Errorf("loading timezone %q: %w", cfg.Timezone, err)
+	}
 
-	fmt.Printf("r2d2 starting with vault: %s\n", cfg.VaultPath)
+	logger.Info("r2d2 starting",
+		"vault", cfg.VaultPath,
+		"timezone", cfg.Timezone,
+		"morning_hour", cfg.MorningHour,
+		"scan_interval", cfg.ScanIntervalMinutes,
+		"dry_run", *dryRun,
+	)
+
+	scanFn := func() ([]obsidian.Task, error) {
+		return obsidian.ScanVault(cfg.VaultPath, cfg.ReminderStatuses, loc)
+	}
+
+	var sender scheduler.Sender
+	if *dryRun {
+		sender = &dryRunSender{}
+	} else {
+		tgClient, err := telegram.New(cfg.TelegramToken, cfg.TelegramChatID)
+		if err != nil {
+			return fmt.Errorf("creating telegram client: %w", err)
+		}
+		sender = tgClient
+	}
+
+	digestFn := reminder.MakeDigestFunc(func() time.Time { return time.Now().In(loc) })
+
+	sched := scheduler.New(
+		scanFn,
+		sender,
+		digestFn,
+		reminder.FormatTimed,
+		loc,
+		cfg.MorningHour,
+		cfg.ScanIntervalMinutes,
+		logger,
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		sig := <-sigCh
+		logger.Info("received signal, shutting down", "signal", sig)
+		cancel()
+	}()
+
+	if err := sched.Run(ctx); err != nil && err != context.Canceled {
+		return fmt.Errorf("scheduler error: %w", err)
+	}
+
+	logger.Info("r2d2 stopped")
+	return nil
+}
+
+func main() {
+	if err := run(); err != nil {
+		slog.Error("fatal", "error", err)
+		os.Exit(1)
+	}
 }

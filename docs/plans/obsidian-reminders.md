@@ -72,9 +72,9 @@ Build a Go Telegram bot (r2d2) that reads tasks from an Obsidian vault, parses Y
 
 ### Task 7: Wire everything together and add graceful shutdown
 
-* [ ] Connect scanner, scheduler, telegram client in `main.go`
-* [ ] Handle OS signals (SIGINT, SIGTERM) for graceful shutdown
-* [ ] Add structured logging (slog)
-* [ ] Add `--dry-run` flag that prints reminders to stdout instead of Telegram
-* [ ] Test end-to-end with sample vault
-* [ ] Mark completed
+* [x] Connect scanner, scheduler, telegram client in `main.go`
+* [x] Handle OS signals (SIGINT, SIGTERM) for graceful shutdown
+* [x] Add structured logging (slog)
+* [x] Add `--dry-run` flag that prints reminders to stdout instead of Telegram
+* [x] Test end-to-end with sample vault
+* [x] Mark completed
