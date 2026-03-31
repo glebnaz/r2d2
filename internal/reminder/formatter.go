@@ -17,6 +17,11 @@ var priorityOrder = map[string]int{
 	"":       3,
 }
 
+var priorityEmoji = map[string]string{
+	"high": "🔴",
+	"low":  "🟢",
+}
+
 func priorityRank(p string) int {
 	if r, ok := priorityOrder[p]; ok {
 		return r
@@ -54,19 +59,20 @@ func FormatDigest(today time.Time, tasks []obsidian.Task) string {
 	}
 
 	var b strings.Builder
-	b.WriteString("*Morning Task Digest*\n")
+	b.WriteString("☀️ *Задачи на сегодня*\n")
+	b.WriteString(fmt.Sprintf("_%s_\n", today.Format("02 January 2006")))
 
 	if len(overdue) > 0 {
-		b.WriteString("\n⚠️ *Overdue:*\n")
+		b.WriteString("\n🚨 *Просрочено:*\n")
 		for _, t := range overdue {
-			b.WriteString(formatTaskLine(t, true))
+			b.WriteString(formatTaskCard(t, true))
 		}
 	}
 
 	if len(due) > 0 {
-		b.WriteString("\n📋 *Due Today:*\n")
+		b.WriteString("\n📋 *Сегодня:*\n")
 		for _, t := range due {
-			b.WriteString(formatTaskLine(t, false))
+			b.WriteString(formatTaskCard(t, false))
 		}
 	}
 
@@ -81,15 +87,19 @@ func FormatTimed(tasks []obsidian.Task) string {
 	t := tasks[0]
 
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("⏰ *Reminder:* %s\n", escapeMarkdown(t.Title)))
+	b.WriteString(fmt.Sprintf("⏰ *%s*\n", escapeMarkdown(t.Title)))
 
-	if t.Priority != "" {
-		b.WriteString(fmt.Sprintf("Priority: %s\n", t.Priority))
+	if emoji, ok := priorityEmoji[t.Priority]; ok {
+		b.WriteString(fmt.Sprintf("%s %s\n", emoji, t.Priority))
 	}
 	if t.Project != "" {
-		b.WriteString(fmt.Sprintf("Project: %s\n", escapeMarkdown(t.Project)))
+		b.WriteString(fmt.Sprintf("📁 %s\n", escapeMarkdown(t.Project)))
 	}
-	b.WriteString(fmt.Sprintf("Due: %s", t.Due.Format("15:04")))
+	b.WriteString(fmt.Sprintf("🕐 %s", t.Due.Format("15:04")))
+
+	if t.Description != "" {
+		b.WriteString(fmt.Sprintf("\n\n%s", escapeMarkdown(t.Description)))
+	}
 
 	return b.String()
 }
@@ -101,19 +111,27 @@ func MakeDigestFunc(now func() time.Time) func([]obsidian.Task) string {
 	}
 }
 
-func formatTaskLine(t obsidian.Task, overdue bool) string {
-	var parts []string
-	parts = append(parts, fmt.Sprintf("• %s", escapeMarkdown(t.Title)))
-	if t.Priority != "" {
-		parts = append(parts, fmt.Sprintf("[%s]", t.Priority))
+func formatTaskCard(t obsidian.Task, overdue bool) string {
+	var b strings.Builder
+
+	b.WriteString(fmt.Sprintf("\n📌 *%s*\n", escapeMarkdown(t.Title)))
+
+	if emoji, ok := priorityEmoji[t.Priority]; ok {
+		b.WriteString(fmt.Sprintf("  %s %s\n", emoji, t.Priority))
 	}
 	if t.Project != "" {
-		parts = append(parts, fmt.Sprintf("_%s_", escapeMarkdown(t.Project)))
+		b.WriteString(fmt.Sprintf("  📁 %s\n", escapeMarkdown(t.Project)))
 	}
 	if overdue {
-		parts = append(parts, fmt.Sprintf("(due %s)", t.Due.Format("Jan 02")))
+		b.WriteString(fmt.Sprintf("  📅 %s _(просрочено)_\n", t.Due.Format("02.01.2006")))
+	} else {
+		b.WriteString(fmt.Sprintf("  📅 %s\n", t.Due.Format("02.01.2006")))
 	}
-	return strings.Join(parts, " ") + "\n"
+	if t.Description != "" {
+		b.WriteString(fmt.Sprintf("  💬 %s\n", escapeMarkdown(t.Description)))
+	}
+
+	return b.String()
 }
 
 // escapeMarkdown escapes special Telegram Markdown v1 characters.

@@ -13,12 +13,13 @@ import (
 
 // Task represents a parsed Obsidian task with relevant frontmatter fields.
 type Task struct {
-	Title    string
-	Due      time.Time
-	HasTime  bool
-	Priority string
-	Project  string
-	FilePath string
+	Title       string
+	Due         time.Time
+	HasTime     bool
+	Priority    string
+	Project     string
+	FilePath    string
+	Description string
 }
 
 // frontmatter represents the YAML frontmatter of an Obsidian note.
@@ -73,14 +74,16 @@ func ScanVault(vaultPath string, reminderStatuses []string, loc *time.Location) 
 		}
 
 		title := strings.TrimSuffix(info.Name(), ".md")
+		desc := parseDescription(path)
 
 		tasks = append(tasks, Task{
-			Title:    title,
-			Due:      due,
-			HasTime:  hasTime,
-			Priority: fm.Priority,
-			Project:  fm.Project,
-			FilePath: path,
+			Title:       title,
+			Due:         due,
+			HasTime:     hasTime,
+			Priority:    fm.Priority,
+			Project:     fm.Project,
+			FilePath:    path,
+			Description: desc,
 		})
 
 		return nil
@@ -130,6 +133,41 @@ func parseFrontmatter(path string) (*frontmatter, error) {
 	}
 
 	return &fm, nil
+}
+
+// parseDescription extracts text under "## Описание" section, trimmed to 250 chars.
+func parseDescription(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer func() { _ = f.Close() }()
+
+	scanner := bufio.NewScanner(f)
+	inDescription := false
+	var lines []string
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		trimmed := strings.TrimSpace(line)
+
+		if trimmed == "## Описание" {
+			inDescription = true
+			continue
+		}
+		if inDescription {
+			if strings.HasPrefix(trimmed, "## ") {
+				break
+			}
+			lines = append(lines, line)
+		}
+	}
+
+	desc := strings.TrimSpace(strings.Join(lines, "\n"))
+	if len([]rune(desc)) > 250 {
+		desc = string([]rune(desc)[:250]) + "…"
+	}
+	return desc
 }
 
 // parseDue parses a due string as either YYYY-MM-DD or YYYY-MM-DDTHH:mm.

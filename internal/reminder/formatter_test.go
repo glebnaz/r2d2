@@ -46,17 +46,17 @@ func TestFormatDigest_OverdueTasks(t *testing.T) {
 
 	result := FormatDigest(today, tasks)
 
-	if !strings.Contains(result, "Overdue:") {
+	if !strings.Contains(result, "Просрочено:") {
 		t.Error("expected overdue section")
 	}
 	if !strings.Contains(result, "Overdue task") {
 		t.Error("expected overdue task in output")
 	}
-	if !strings.Contains(result, "Due Today:") {
+	if !strings.Contains(result, "Сегодня:") {
 		t.Error("expected due today section")
 	}
-	if !strings.Contains(result, "(due Mar 28)") {
-		t.Errorf("expected due date for overdue task, got:\n%s", result)
+	if !strings.Contains(result, "просрочено") {
+		t.Errorf("expected overdue label, got:\n%s", result)
 	}
 }
 
@@ -68,8 +68,8 @@ func TestFormatDigest_IncludesProjectAndPriority(t *testing.T) {
 
 	result := FormatDigest(today, tasks)
 
-	if !strings.Contains(result, "[high]") {
-		t.Errorf("expected priority in output:\n%s", result)
+	if !strings.Contains(result, "🔴") {
+		t.Errorf("expected priority emoji in output:\n%s", result)
 	}
 	if !strings.Contains(result, "R2D2") {
 		t.Errorf("expected project in output:\n%s", result)
@@ -91,8 +91,21 @@ func TestFormatDigest_NoPriority(t *testing.T) {
 
 	result := FormatDigest(today, tasks)
 
-	if strings.Contains(result, "[]") {
-		t.Error("should not show empty priority brackets")
+	if strings.Contains(result, "🔴") || strings.Contains(result, "🟢") {
+		t.Error("should not show priority emoji when no priority")
+	}
+}
+
+func TestFormatDigest_WithDescription(t *testing.T) {
+	today := date(2026, 3, 30)
+	tasks := []obsidian.Task{
+		{Title: "Task", Due: today, Description: "Some details here"},
+	}
+
+	result := FormatDigest(today, tasks)
+
+	if !strings.Contains(result, "Some details here") {
+		t.Errorf("expected description in output:\n%s", result)
 	}
 }
 
@@ -103,20 +116,29 @@ func TestFormatTimed_SingleTask(t *testing.T) {
 
 	result := FormatTimed(tasks)
 
-	if !strings.Contains(result, "Reminder:") {
-		t.Error("expected reminder header")
-	}
 	if !strings.Contains(result, "Meeting") {
 		t.Error("expected task title")
 	}
 	if !strings.Contains(result, "14:30") {
 		t.Error("expected time")
 	}
-	if !strings.Contains(result, "high") {
-		t.Error("expected priority")
+	if !strings.Contains(result, "🔴") {
+		t.Error("expected priority emoji")
 	}
 	if !strings.Contains(result, "Work") {
 		t.Error("expected project")
+	}
+}
+
+func TestFormatTimed_WithDescription(t *testing.T) {
+	tasks := []obsidian.Task{
+		{Title: "Call", Due: datetime(2026, 3, 30, 14, 30), HasTime: true, Description: "Call John about the project"},
+	}
+
+	result := FormatTimed(tasks)
+
+	if !strings.Contains(result, "Call John about the project") {
+		t.Errorf("expected description in output:\n%s", result)
 	}
 }
 
@@ -130,10 +152,10 @@ func TestFormatTimed_MinimalTask(t *testing.T) {
 	if !strings.Contains(result, "Quick call") {
 		t.Error("expected task title")
 	}
-	if strings.Contains(result, "Priority") {
+	if strings.Contains(result, "🔴") || strings.Contains(result, "🟢") {
 		t.Error("should not show priority when empty")
 	}
-	if strings.Contains(result, "Project") {
+	if strings.Contains(result, "📁") {
 		t.Error("should not show project when empty")
 	}
 }
@@ -188,8 +210,8 @@ func TestFormatDigest_OverdueBeforeDueToday(t *testing.T) {
 
 	result := FormatDigest(today, tasks)
 
-	overdueIdx := strings.Index(result, "Overdue:")
-	dueTodayIdx := strings.Index(result, "Due Today:")
+	overdueIdx := strings.Index(result, "Просрочено:")
+	dueTodayIdx := strings.Index(result, "Сегодня:")
 
 	if overdueIdx > dueTodayIdx {
 		t.Error("overdue section should appear before due today section")
