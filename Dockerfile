@@ -1,0 +1,18 @@
+FROM golang:1.25-alpine AS builder
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /r2d2 ./cmd/r2d2
+
+FROM alpine:3.21
+
+RUN apk add --no-cache ca-certificates tzdata
+
+COPY --from=builder /r2d2 /usr/local/bin/r2d2
+
+ENTRYPOINT ["r2d2"]
