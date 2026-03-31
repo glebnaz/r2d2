@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"r2d2/internal/digest"
+	"r2d2/internal/metrics"
 	"r2d2/internal/obsidian"
 )
 
@@ -140,11 +141,18 @@ func (s *Scheduler) newMidnightTimer() *time.Timer {
 
 // buildSchedule scans the vault and schedules reminders for today's tasks.
 func (s *Scheduler) buildSchedule(ctx context.Context) {
+	scanStart := time.Now()
 	tasks, err := s.scanFn()
+	metrics.VaultScanDuration.Observe(time.Since(scanStart).Seconds())
+	metrics.VaultScans.Inc()
+
 	if err != nil {
+		metrics.VaultScanErrors.Inc()
 		s.logger.Error("failed to scan vault", "error", err)
 		return
 	}
+
+	metrics.TasksScanned.Set(float64(len(tasks)))
 
 	now := s.now().In(s.loc)
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, s.loc)
@@ -158,6 +166,7 @@ func (s *Scheduler) buildSchedule(ctx context.Context) {
 
 	morningTime := time.Date(now.Year(), now.Month(), now.Day(), s.morningHour, 0, 0, 0, s.loc)
 	hasMorningWork := false
+	var dueToday, overdueCount int
 
 	for _, task := range tasks {
 		taskDate := time.Date(task.Due.Year(), task.Due.Month(), task.Due.Day(), 0, 0, 0, 0, s.loc)
@@ -165,13 +174,21 @@ func (s *Scheduler) buildSchedule(ctx context.Context) {
 		if task.HasTime {
 			if taskDate.Equal(today) {
 				s.scheduleTimed(ctx, task, now)
+				dueToday++
 			}
 		} else {
-			if taskDate.Equal(today) || taskDate.Before(today) {
+			if taskDate.Before(today) {
 				hasMorningWork = true
+				overdueCount++
+			} else if taskDate.Equal(today) {
+				hasMorningWork = true
+				dueToday++
 			}
 		}
 	}
+
+	metrics.TasksDueToday.Set(float64(dueToday))
+	metrics.TasksOverdue.Set(float64(overdueCount))
 
 	if hasMorningWork {
 		s.scheduleMorningDigest(ctx, morningTime, now)
@@ -206,11 +223,13 @@ func (s *Scheduler) scheduleTimed(ctx context.Context, task obsidian.Task, now t
 
 		msg := s.formatTimed([]obsidian.Task{task})
 		if err := s.sender.SendMessage(ctx, msg); err != nil {
+			metrics.NotificationErrors.Inc()
 			s.logger.Error("failed to send timed reminder", "task", task.Title, "error", err)
 			s.mu.Lock()
 			delete(s.sent, key)
 			s.mu.Unlock()
 		} else {
+			metrics.TimedRemindersSent.Inc()
 			s.logger.Info("sent timed reminder", "task", task.Title)
 		}
 	})
@@ -251,11 +270,13 @@ func (s *Scheduler) scheduleMorningDigest(ctx context.Context, morningTime, now 
 			return
 		}
 		if err := s.sender.SendMessage(ctx, msg); err != nil {
+			metrics.NotificationErrors.Inc()
 			s.logger.Error("failed to send morning digest", "error", err)
 			s.mu.Lock()
 			delete(s.sent, digestKey)
 			s.mu.Unlock()
 		} else {
+			metrics.DigestsSent.Inc()
 			s.logger.Info("sent morning digest")
 		}
 	}

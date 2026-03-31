@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,6 +13,7 @@ import (
 
 	"r2d2/internal/config"
 	"r2d2/internal/digest"
+	"r2d2/internal/metrics"
 	"r2d2/internal/obsidian"
 	"r2d2/internal/reminder"
 	"r2d2/internal/scheduler"
@@ -86,6 +88,17 @@ func run() error {
 		logger,
 	)
 
+	// Start metrics HTTP server.
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", metrics.Handler())
+	metricsServer := &http.Server{Addr: ":9182", Handler: mux}
+	go func() {
+		logger.Info("metrics server starting", "addr", ":9182")
+		if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Error("metrics server error", "error", err)
+		}
+	}()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -102,6 +115,7 @@ func run() error {
 		return fmt.Errorf("scheduler error: %w", err)
 	}
 
+	_ = metricsServer.Close()
 	logger.Info("r2d2 stopped")
 	return nil
 }
