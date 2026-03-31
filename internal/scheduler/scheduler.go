@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"r2d2/internal/digest"
 	"r2d2/internal/obsidian"
 )
 
@@ -28,7 +29,7 @@ type nowFunc func() time.Time
 type Scheduler struct {
 	scanFn       ScanFunc
 	sender       Sender
-	formatDigest FormatFunc
+	digestEngine *digest.Engine
 	formatTimed  FormatFunc
 	loc          *time.Location
 	morningHour  int
@@ -36,18 +37,18 @@ type Scheduler struct {
 	logger       *slog.Logger
 	now          nowFunc
 
-	mu       sync.Mutex
-	sent     map[string]bool // tracks sent reminders: "filepath:YYYY-MM-DD" or "filepath:YYYY-MM-DDTHH:mm"
-	timers   []*time.Timer
-	stopCh   chan struct{}
-	stopped  bool
+	mu      sync.Mutex
+	sent    map[string]bool // tracks sent reminders: "filepath:YYYY-MM-DD" or "filepath:YYYY-MM-DDTHH:mm"
+	timers  []*time.Timer
+	stopCh  chan struct{}
+	stopped bool
 }
 
 // New creates a new Scheduler.
 func New(
 	scanFn ScanFunc,
 	sender Sender,
-	formatDigest FormatFunc,
+	digestEngine *digest.Engine,
 	formatTimed FormatFunc,
 	loc *time.Location,
 	morningHour int,
@@ -60,7 +61,7 @@ func New(
 	return &Scheduler{
 		scanFn:       scanFn,
 		sender:       sender,
-		formatDigest: formatDigest,
+		digestEngine: digestEngine,
 		formatTimed:  formatTimed,
 		loc:          loc,
 		morningHour:  morningHour,
@@ -149,37 +150,34 @@ func (s *Scheduler) buildSchedule(ctx context.Context) {
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, s.loc)
 
 	s.mu.Lock()
-	// Cancel existing timers before rebuilding.
 	for _, t := range s.timers {
 		t.Stop()
 	}
 	s.timers = nil
 	s.mu.Unlock()
 
-	var morningTasks []obsidian.Task
 	morningTime := time.Date(now.Year(), now.Month(), now.Day(), s.morningHour, 0, 0, 0, s.loc)
+	hasMorningWork := false
 
 	for _, task := range tasks {
 		taskDate := time.Date(task.Due.Year(), task.Due.Month(), task.Due.Day(), 0, 0, 0, 0, s.loc)
 
 		if task.HasTime {
-			// Timed task: schedule at its specific time if it's today and not yet passed.
 			if taskDate.Equal(today) {
 				s.scheduleTimed(ctx, task, now)
 			}
 		} else {
-			// Date-only task: include in morning digest if due today or overdue.
 			if taskDate.Equal(today) || taskDate.Before(today) {
-				morningTasks = append(morningTasks, task)
+				hasMorningWork = true
 			}
 		}
 	}
 
-	if len(morningTasks) > 0 {
-		s.scheduleMorningDigest(ctx, morningTasks, morningTime, now)
+	if hasMorningWork {
+		s.scheduleMorningDigest(ctx, morningTime, now)
 	}
 
-	s.logger.Info("schedule built", "morning_tasks", len(morningTasks), "total_scanned", len(tasks))
+	s.logger.Info("schedule built", "total_scanned", len(tasks))
 }
 
 // scheduleTimed schedules a single timed task reminder.
@@ -194,7 +192,6 @@ func (s *Scheduler) scheduleTimed(ctx context.Context, task obsidian.Task, now t
 
 	delay := task.Due.Sub(now)
 	if delay <= 0 {
-		// Time has passed, skip.
 		return
 	}
 
@@ -223,9 +220,8 @@ func (s *Scheduler) scheduleTimed(ctx context.Context, task obsidian.Task, now t
 	s.mu.Unlock()
 }
 
-// scheduleMorningDigest schedules a morning digest for date-only (and overdue) tasks.
-func (s *Scheduler) scheduleMorningDigest(ctx context.Context, tasks []obsidian.Task, morningTime, now time.Time) {
-	// Build a composite key for the digest.
+// scheduleMorningDigest schedules the morning digest using the digest engine.
+func (s *Scheduler) scheduleMorningDigest(ctx context.Context, morningTime, now time.Time) {
 	digestKey := fmt.Sprintf("digest:%s", now.Format("2006-01-02"))
 	s.mu.Lock()
 	if s.sent[digestKey] {
@@ -234,9 +230,7 @@ func (s *Scheduler) scheduleMorningDigest(ctx context.Context, tasks []obsidian.
 	}
 	s.mu.Unlock()
 
-	delay := morningTime.Sub(now)
-	if delay <= 0 {
-		// Morning time has passed; send immediately.
+	sendDigest := func() {
 		s.mu.Lock()
 		if s.sent[digestKey] {
 			s.mu.Unlock()
@@ -245,68 +239,34 @@ func (s *Scheduler) scheduleMorningDigest(ctx context.Context, tasks []obsidian.
 		s.sent[digestKey] = true
 		s.mu.Unlock()
 
-		msg := s.formatDigest(tasks)
+		msg, err := s.digestEngine.Build(ctx, s.now().In(s.loc))
+		if err != nil {
+			s.logger.Error("failed to build digest", "error", err)
+			s.mu.Lock()
+			delete(s.sent, digestKey)
+			s.mu.Unlock()
+			return
+		}
+		if msg == "" {
+			return
+		}
 		if err := s.sender.SendMessage(ctx, msg); err != nil {
 			s.logger.Error("failed to send morning digest", "error", err)
 			s.mu.Lock()
 			delete(s.sent, digestKey)
 			s.mu.Unlock()
 		} else {
-			s.logger.Info("sent morning digest", "tasks", len(tasks))
+			s.logger.Info("sent morning digest")
 		}
+	}
+
+	delay := morningTime.Sub(now)
+	if delay <= 0 {
+		sendDigest()
 		return
 	}
 
-	timer := time.AfterFunc(delay, func() {
-		s.mu.Lock()
-		if s.sent[digestKey] {
-			s.mu.Unlock()
-			return
-		}
-		s.sent[digestKey] = true
-		s.mu.Unlock()
-
-		// Re-scan to get the latest tasks for the digest.
-		freshTasks, err := s.scanFn()
-		if err != nil {
-			s.logger.Error("failed to rescan for morning digest", "error", err)
-			msg := s.formatDigest(tasks)
-			if sendErr := s.sender.SendMessage(ctx, msg); sendErr != nil {
-				s.logger.Error("failed to send morning digest", "error", sendErr)
-				s.mu.Lock()
-				delete(s.sent, digestKey)
-				s.mu.Unlock()
-			}
-			return
-		}
-
-		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, s.loc)
-		var digestTasks []obsidian.Task
-		for _, t := range freshTasks {
-			if t.HasTime {
-				continue
-			}
-			taskDate := time.Date(t.Due.Year(), t.Due.Month(), t.Due.Day(), 0, 0, 0, 0, s.loc)
-			if taskDate.Equal(today) || taskDate.Before(today) {
-				digestTasks = append(digestTasks, t)
-			}
-		}
-
-		if len(digestTasks) == 0 {
-			digestTasks = tasks
-		}
-
-		msg := s.formatDigest(digestTasks)
-		if sendErr := s.sender.SendMessage(ctx, msg); sendErr != nil {
-			s.logger.Error("failed to send morning digest", "error", sendErr)
-			s.mu.Lock()
-			delete(s.sent, digestKey)
-			s.mu.Unlock()
-		} else {
-			s.logger.Info("sent morning digest", "tasks", len(digestTasks))
-		}
-	})
-
+	timer := time.AfterFunc(delay, sendDigest)
 	s.mu.Lock()
 	s.timers = append(s.timers, timer)
 	s.mu.Unlock()

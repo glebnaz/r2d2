@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"r2d2/internal/config"
+	"r2d2/internal/digest"
 	"r2d2/internal/obsidian"
 	"r2d2/internal/reminder"
 	"r2d2/internal/scheduler"
@@ -70,12 +71,14 @@ func run() error {
 		sender = tgClient
 	}
 
-	digestFn := reminder.MakeDigestFunc(func() time.Time { return time.Now().In(loc) })
+	// Build digest engine with collectors.
+	engine := digest.NewEngine()
+	engine.Register(digest.NewTasksCollector(scanFn, loc))
 
 	sched := scheduler.New(
 		scanFn,
 		sender,
-		digestFn,
+		engine,
 		reminder.FormatTimed,
 		loc,
 		cfg.MorningHour,
