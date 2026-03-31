@@ -81,7 +81,7 @@ func ScanVault(vaultPath string, reminderStatuses []string, loc *time.Location) 
 			Due:         due,
 			HasTime:     hasTime,
 			Priority:    fm.Priority,
-			Project:     fm.Project,
+			Project:     cleanProject(fm.Project),
 			FilePath:    path,
 			Description: desc,
 		})
@@ -133,6 +133,18 @@ func parseFrontmatter(path string) (*frontmatter, error) {
 	}
 
 	return &fm, nil
+}
+
+// cleanProject strips wikilink syntax and numeric prefix from project field.
+// "[[01 ProjectName]]" -> "ProjectName"
+func cleanProject(p string) string {
+	p = strings.TrimPrefix(p, "[[")
+	p = strings.TrimSuffix(p, "]]")
+	// Strip "01 " numeric prefix
+	if len(p) > 3 && p[2] == ' ' && p[0] >= '0' && p[0] <= '9' && p[1] >= '0' && p[1] <= '9' {
+		p = p[3:]
+	}
+	return strings.TrimSpace(p)
 }
 
 // parseDescription extracts text under "## Описание" section, trimmed to 250 chars.
