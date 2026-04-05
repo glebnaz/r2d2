@@ -168,7 +168,10 @@ func (s *Syncer) sync(ctx context.Context) error {
 	}
 
 	// Check if local branch is ahead of remote (handles new commits and retries of previously failed pushes).
-	aheadOut, _, _ := s.git(syncCtx, "rev-list", fmt.Sprintf("origin/%s..HEAD", s.cfg.Branch), "--count")
+	aheadOut, revListStderr, revListErr := s.git(syncCtx, "rev-list", fmt.Sprintf("origin/%s..HEAD", s.cfg.Branch), "--count")
+	if revListErr != nil {
+		return fmt.Errorf("git rev-list: %s: %w", revListStderr, revListErr)
+	}
 	if strings.TrimSpace(aheadOut) == "0" {
 		return nil
 	}
@@ -187,7 +190,7 @@ func (s *Syncer) sync(ctx context.Context) error {
 			s.logger.Error("push conflict detected", "stderr", pushStderr)
 			if s.cfg.NotifyOnConflict {
 				msg := FormatConflictAlert(pushStderr, time.Now())
-				if notifyErr := s.notifier.SendMessage(syncCtx, msg); notifyErr != nil {
+				if notifyErr := s.notifier.SendMessage(ctx, msg); notifyErr != nil {
 					s.logger.Error("failed to send conflict notification", "error", notifyErr)
 				}
 			}
@@ -206,7 +209,7 @@ func (s *Syncer) sync(ctx context.Context) error {
 	s.logger.Info("push successful", "files_changed", pushFilesChanged)
 	if s.cfg.NotifyOnPush {
 		msg := FormatPushNotification(pushFilesChanged, pushStat, time.Now())
-		if notifyErr := s.notifier.SendMessage(syncCtx, msg); notifyErr != nil {
+		if notifyErr := s.notifier.SendMessage(ctx, msg); notifyErr != nil {
 			s.logger.Error("failed to send push notification", "error", notifyErr)
 		}
 	}

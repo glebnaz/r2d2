@@ -106,6 +106,9 @@ func Load(path string) (*Config, error) {
 	if cfg.MorningHour < 0 || cfg.MorningHour > 23 {
 		return nil, fmt.Errorf("morning_hour must be between 0 and 23, got %d", cfg.MorningHour)
 	}
+	if cfg.ScanIntervalMinutes < 1 {
+		return nil, fmt.Errorf("scan_interval_minutes must be >= 1, got %d", cfg.ScanIntervalMinutes)
+	}
 
 	if raw.GitSync != nil {
 		gs := &GitSyncConfig{
