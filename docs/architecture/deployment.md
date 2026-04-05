@@ -26,6 +26,9 @@ r2d2:
   volumes:
     - ./config/r2d2/config.json:/etc/r2d2/config.json:ro
     - /home/glebnaz/Documents/my-vault:/vault:ro
+    - r2d2-git-vault:/data/git-vault
+  environment:
+    - GIT_TOKEN=${R2D2_GIT_TOKEN}
   command: ["--config", "/etc/r2d2/config.json"]
   ports:
     - "9182:9182"
@@ -33,6 +36,14 @@ r2d2:
 ```
 
 DNS явно указан — без него контейнер не резолвит `api.telegram.org` (pihole на том же хосте перехватывает).
+
+## Git Sync
+
+Если включён git sync, контейнеру нужны дополнительные ресурсы:
+
+- **`r2d2-git-vault`** — Docker volume для git working tree. Бот клонирует репозиторий сюда при первом запуске, затем rsync из vault + commit + push по таймеру.
+- **`GIT_TOKEN`** — токен для push в GitHub. Передаётся через переменную окружения. Используется в repo URL: `https://<token>@github.com/user/vault.git`.
+- **`git`, `rsync`, `openssh-client`** — установлены в Docker-образе (`apk add` в Dockerfile).
 
 ## Obsidian Sync
 

@@ -45,7 +45,7 @@ Add a new feature to R2D2 that periodically pushes Obsidian vault changes to a G
 - [x] Mark completed
 
 ### Task 6: Documentation
-- [ ] Update `CLAUDE.md`: add `internal/gitsync/` to architecture, new config fields, new metrics
-- [ ] Update `docs/architecture/deployment.md`: add git-vault volume mount, GIT_TOKEN env, updated docker-compose example
-- [ ] Create `docs/architecture/git-sync.md` describing the sync flow and design decisions
-- [ ] Mark completed
+- [x] Update `CLAUDE.md`: add `internal/gitsync/` to architecture, new config fields, new metrics
+- [x] Update `docs/architecture/deployment.md`: add git-vault volume mount, GIT_TOKEN env, updated docker-compose example
+- [x] Create `docs/architecture/git-sync.md` describing the sync flow and design decisions
+- [x] Mark completed
