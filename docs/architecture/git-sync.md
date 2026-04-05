@@ -74,5 +74,5 @@ Telegram Bot API
 
 - **rsync вместо file watcher**: Vault примонтирован read-only, fsnotify не нужен. rsync с `--delete` гарантирует полную синхронизацию за один проход.
 - **Отдельный working tree**: Бот не трогает vault. Git-операции происходят в отдельной директории (Docker volume).
-- **Конфликты не разрешаются автоматически**: При non-fast-forward push бот отправляет alert и ждёт ручного разрешения. Это безопаснее, чем автоматический force-push или rebase.
+- **Автоматическое восстановление при конфликтах**: При non-fast-forward push бот отправляет alert в Telegram, сбрасывает локальный коммит (`git reset --hard origin/<branch>`) и повторяет попытку при следующей синхронизации. Force-push и rebase не используются.
 - **Notifier interface**: Тот же интерфейс `SendMessage` что и у scheduler — позволяет использовать dry-run sender для тестов.
