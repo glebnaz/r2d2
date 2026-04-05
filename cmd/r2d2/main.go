@@ -13,6 +13,7 @@ import (
 
 	"r2d2/internal/config"
 	"r2d2/internal/digest"
+	"r2d2/internal/gitsync"
 	"r2d2/internal/metrics"
 	"r2d2/internal/obsidian"
 	"r2d2/internal/reminder"
@@ -110,6 +111,16 @@ func run() error {
 		logger.Info("received signal, shutting down", "signal", sig)
 		cancel()
 	}()
+
+	// Start git sync if enabled.
+	if cfg.GitSync != nil && cfg.GitSync.Enabled {
+		syncer := gitsync.New(cfg.GitSync, cfg.VaultPath, sender, logger)
+		go func() {
+			if err := syncer.Run(ctx); err != nil && err != context.Canceled {
+				logger.Error("git sync error", "error", err)
+			}
+		}()
+	}
 
 	if err := sched.Run(ctx); err != nil && err != context.Canceled {
 		return fmt.Errorf("scheduler error: %w", err)

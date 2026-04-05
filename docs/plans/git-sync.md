@@ -39,10 +39,10 @@ Add a new feature to R2D2 that periodically pushes Obsidian vault changes to a G
 - [x] Mark completed
 
 ### Task 5: Wire into main.go and update Dockerfile
-- [ ] Add conditional gitsync startup in `cmd/r2d2/main.go`: if `cfg.GitSync != nil && cfg.GitSync.Enabled`, create Syncer and run in goroutine with shared ctx
-- [ ] Add `git`, `rsync`, `openssh-client` to Dockerfile runtime image (`apk add --no-cache`)
-- [ ] Add tests
-- [ ] Mark completed
+- [x] Add conditional gitsync startup in `cmd/r2d2/main.go`: if `cfg.GitSync != nil && cfg.GitSync.Enabled`, create Syncer and run in goroutine with shared ctx
+- [x] Add `git`, `rsync`, `openssh-client` to Dockerfile runtime image (`apk add --no-cache`)
+- [x] Add tests
+- [x] Mark completed
 
 ### Task 6: Documentation
 - [ ] Update `CLAUDE.md`: add `internal/gitsync/` to architecture, new config fields, new metrics
