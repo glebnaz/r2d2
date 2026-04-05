@@ -55,7 +55,9 @@ func (s *Syncer) gitEnv() []string {
 
 // git runs a git command in the work directory with configured author env vars.
 func (s *Syncer) git(ctx context.Context, args ...string) (string, string, error) {
-	cmd := exec.CommandContext(ctx, "git", args...)
+	// Prepend -c core.quotePath=false so git doesn't escape non-ASCII paths.
+	full := append([]string{"-c", "core.quotePath=false"}, args...)
+	cmd := exec.CommandContext(ctx, "git", full...)
 	cmd.Dir = s.cfg.WorkDir
 	cmd.Env = s.gitEnv()
 
@@ -183,8 +185,7 @@ func (s *Syncer) sync(ctx context.Context) error {
 		return nil
 	}
 
-	// Collect push stats for notification before pushing.
-	pushStat, _, _ := s.git(syncCtx, "diff", "--stat", fmt.Sprintf("origin/%s..HEAD", s.cfg.Branch))
+	// Collect changed file names for notification before pushing.
 	pushNames, _, _ := s.git(syncCtx, "diff", "--name-only", fmt.Sprintf("origin/%s..HEAD", s.cfg.Branch))
 	pushFilesChanged := countLines(pushNames)
 
@@ -215,7 +216,7 @@ func (s *Syncer) sync(ctx context.Context) error {
 
 	s.logger.Info("push successful", "files_changed", pushFilesChanged)
 	if s.cfg.NotifyOnPush {
-		msg := FormatPushNotification(pushFilesChanged, pushStat, time.Now())
+		msg := FormatPushNotification(pushFilesChanged, pushNames, time.Now())
 		if notifyErr := s.notifier.SendMessage(syncCtx, msg); notifyErr != nil {
 			s.logger.Error("failed to send push notification", "error", notifyErr)
 		}
