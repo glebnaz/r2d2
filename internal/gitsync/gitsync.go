@@ -15,6 +15,8 @@ import (
 	"r2d2/internal/metrics"
 )
 
+const syncTimeout = 5 * time.Minute
+
 // Notifier sends notifications to the user.
 type Notifier interface {
 	SendMessage(ctx context.Context, text string) error
@@ -111,6 +113,9 @@ func (s *Syncer) ensureRepo(ctx context.Context) error {
 
 // sync performs one sync cycle: fetch, rsync vault to workDir, stage, commit, push.
 func (s *Syncer) sync(ctx context.Context) error {
+	syncCtx, cancel := context.WithTimeout(ctx, syncTimeout)
+	defer cancel()
+
 	start := time.Now()
 	metrics.GitSyncsTotal.Inc()
 	defer func() {
@@ -118,12 +123,17 @@ func (s *Syncer) sync(ctx context.Context) error {
 	}()
 
 	// Fetch latest remote state to keep origin/<branch> up to date.
-	if _, stderr, err := s.git(ctx, "fetch", "origin", s.cfg.Branch); err != nil {
+	if _, stderr, err := s.git(syncCtx, "fetch", "origin", s.cfg.Branch); err != nil {
 		return fmt.Errorf("git fetch: %s: %w", stderr, err)
 	}
 
+	// Verify vault path exists to prevent rsync --delete from wiping the working tree.
+	if _, err := os.Stat(s.vaultPath); err != nil {
+		return fmt.Errorf("vault path %q not accessible: %w", s.vaultPath, err)
+	}
+
 	// rsync vault to workDir, excluding .git and .obsidian.
-	rsyncCmd := exec.CommandContext(ctx, "rsync",
+	rsyncCmd := exec.CommandContext(syncCtx, "rsync",
 		"-a", "--delete",
 		"--exclude", ".git",
 		"--exclude", ".obsidian",
@@ -137,33 +147,39 @@ func (s *Syncer) sync(ctx context.Context) error {
 	}
 
 	// Stage all changes.
-	if _, stderr, err := s.git(ctx, "add", "-A"); err != nil {
+	if _, stderr, err := s.git(syncCtx, "add", "-A"); err != nil {
 		return fmt.Errorf("git add: %s: %w", stderr, err)
 	}
 
-	// Check if there are staged changes.
-	if _, _, err := s.git(ctx, "diff", "--cached", "--quiet"); err == nil {
-		s.logger.Info("no changes to sync")
+	// Commit if there are staged changes.
+	if _, _, err := s.git(syncCtx, "diff", "--cached", "--quiet"); err != nil {
+		diffStat, _, _ := s.git(syncCtx, "diff", "--cached", "--stat")
+		namesOut, _, _ := s.git(syncCtx, "diff", "--cached", "--name-only")
+		filesChanged := countLines(namesOut)
+		metrics.GitFilesChanged.Set(float64(filesChanged))
+
+		commitMsg := fmt.Sprintf("vault sync: %d files changed\n\n%s", filesChanged, strings.TrimSpace(diffStat))
+		if _, stderr, err := s.git(syncCtx, "commit", "-m", commitMsg); err != nil {
+			return fmt.Errorf("git commit: %s: %w", stderr, err)
+		}
+	} else {
+		s.logger.Info("no new vault changes")
 		metrics.GitFilesChanged.Set(0)
+	}
+
+	// Check if local branch is ahead of remote (handles new commits and retries of previously failed pushes).
+	aheadOut, _, _ := s.git(syncCtx, "rev-list", fmt.Sprintf("origin/%s..HEAD", s.cfg.Branch), "--count")
+	if strings.TrimSpace(aheadOut) == "0" {
 		return nil
 	}
 
-	// Get diff stat for commit message.
-	diffStat, _, _ := s.git(ctx, "diff", "--cached", "--stat")
-
-	// Count changed files.
-	namesOut, _, _ := s.git(ctx, "diff", "--cached", "--name-only")
-	filesChanged := countLines(namesOut)
-	metrics.GitFilesChanged.Set(float64(filesChanged))
-
-	// Commit.
-	commitMsg := fmt.Sprintf("vault sync: %d files changed\n\n%s", filesChanged, strings.TrimSpace(diffStat))
-	if _, stderr, err := s.git(ctx, "commit", "-m", commitMsg); err != nil {
-		return fmt.Errorf("git commit: %s: %w", stderr, err)
-	}
+	// Collect push stats for notification before pushing.
+	pushStat, _, _ := s.git(syncCtx, "diff", "--stat", fmt.Sprintf("origin/%s..HEAD", s.cfg.Branch))
+	pushNames, _, _ := s.git(syncCtx, "diff", "--name-only", fmt.Sprintf("origin/%s..HEAD", s.cfg.Branch))
+	pushFilesChanged := countLines(pushNames)
 
 	// Push.
-	_, pushStderr, pushErr := s.git(ctx, "push", "origin", s.cfg.Branch)
+	_, pushStderr, pushErr := s.git(syncCtx, "push", "origin", s.cfg.Branch)
 	if pushErr != nil {
 		if isConflict(pushStderr) {
 			metrics.GitConflicts.Inc()
@@ -171,12 +187,12 @@ func (s *Syncer) sync(ctx context.Context) error {
 			s.logger.Error("push conflict detected", "stderr", pushStderr)
 			if s.cfg.NotifyOnConflict {
 				msg := FormatConflictAlert(pushStderr, time.Now())
-				if notifyErr := s.notifier.SendMessage(ctx, msg); notifyErr != nil {
+				if notifyErr := s.notifier.SendMessage(syncCtx, msg); notifyErr != nil {
 					s.logger.Error("failed to send conflict notification", "error", notifyErr)
 				}
 			}
 			// Reset local branch to match remote to prevent permanent divergence.
-			if _, errOut, resetErr := s.git(ctx, "reset", "--hard", "origin/"+s.cfg.Branch); resetErr != nil {
+			if _, errOut, resetErr := s.git(syncCtx, "reset", "--hard", "origin/"+s.cfg.Branch); resetErr != nil {
 				s.logger.Error("failed to reset after conflict", "error", resetErr, "stderr", errOut)
 			}
 			return fmt.Errorf("push conflict: %s", pushStderr)
@@ -187,10 +203,10 @@ func (s *Syncer) sync(ctx context.Context) error {
 
 	metrics.GitPushesTotal.Inc()
 
-	s.logger.Info("push successful", "files_changed", filesChanged)
+	s.logger.Info("push successful", "files_changed", pushFilesChanged)
 	if s.cfg.NotifyOnPush {
-		msg := FormatPushNotification(filesChanged, diffStat, time.Now())
-		if notifyErr := s.notifier.SendMessage(ctx, msg); notifyErr != nil {
+		msg := FormatPushNotification(pushFilesChanged, pushStat, time.Now())
+		if notifyErr := s.notifier.SendMessage(syncCtx, msg); notifyErr != nil {
 			s.logger.Error("failed to send push notification", "error", notifyErr)
 		}
 	}

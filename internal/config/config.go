@@ -103,6 +103,9 @@ func Load(path string) (*Config, error) {
 	if cfg.TelegramChatID == 0 {
 		return nil, fmt.Errorf("telegram_chat_id is required")
 	}
+	if cfg.MorningHour < 0 || cfg.MorningHour > 23 {
+		return nil, fmt.Errorf("morning_hour must be between 0 and 23, got %d", cfg.MorningHour)
+	}
 
 	if raw.GitSync != nil {
 		gs := &GitSyncConfig{
