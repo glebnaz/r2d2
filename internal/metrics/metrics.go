@@ -61,6 +61,39 @@ var (
 		Help:    "Duration of digest collector execution.",
 		Buckets: prometheus.DefBuckets,
 	}, []string{"collector"})
+
+	// Git sync metrics.
+
+	GitSyncsTotal = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "r2d2_git_syncs_total",
+		Help: "Total number of git sync cycles executed.",
+	})
+
+	GitPushesTotal = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "r2d2_git_pushes_total",
+		Help: "Total number of successful git pushes.",
+	})
+
+	GitPushErrors = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "r2d2_git_push_errors_total",
+		Help: "Total number of failed git pushes.",
+	})
+
+	GitConflicts = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "r2d2_git_conflicts_total",
+		Help: "Total number of git push conflicts detected.",
+	})
+
+	GitSyncDuration = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    "r2d2_git_sync_duration_seconds",
+		Help:    "Duration of git sync cycles.",
+		Buckets: prometheus.DefBuckets,
+	})
+
+	GitFilesChanged = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "r2d2_git_files_changed_last",
+		Help: "Number of files changed in the last git sync.",
+	})
 )
 
 func init() {
@@ -75,6 +108,12 @@ func init() {
 		VaultScanErrors,
 		VaultScanDuration,
 		CollectorDuration,
+		GitSyncsTotal,
+		GitPushesTotal,
+		GitPushErrors,
+		GitConflicts,
+		GitSyncDuration,
+		GitFilesChanged,
 	)
 }
 

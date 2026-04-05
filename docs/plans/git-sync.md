@@ -16,10 +16,10 @@ Add a new feature to R2D2 that periodically pushes Obsidian vault changes to a G
 - [x] Mark completed
 
 ### Task 2: Metrics — add git sync Prometheus counters
-- [ ] Add metrics to `internal/metrics/metrics.go`: `r2d2_git_syncs_total`, `r2d2_git_pushes_total`, `r2d2_git_push_errors_total`, `r2d2_git_conflicts_total`, `r2d2_git_sync_duration_seconds` (histogram), `r2d2_git_files_changed_last` (gauge)
-- [ ] Register all new metrics in `init()`
-- [ ] Add tests
-- [ ] Mark completed
+- [x] Add metrics to `internal/metrics/metrics.go`: `r2d2_git_syncs_total`, `r2d2_git_pushes_total`, `r2d2_git_push_errors_total`, `r2d2_git_conflicts_total`, `r2d2_git_sync_duration_seconds` (histogram), `r2d2_git_files_changed_last` (gauge)
+- [x] Register all new metrics in `init()`
+- [x] Add tests
+- [x] Mark completed
 
 ### Task 3: Core gitsync package — Syncer with Run/sync/ensureRepo
 - [ ] Create `internal/gitsync/gitsync.go` with `Notifier` interface, `Syncer` struct, and `New()` constructor
