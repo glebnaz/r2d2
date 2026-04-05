@@ -127,9 +127,16 @@ func (s *Syncer) sync(ctx context.Context) error {
 		return fmt.Errorf("git fetch: %s: %w", stderr, err)
 	}
 
-	// Verify vault path exists to prevent rsync --delete from wiping the working tree.
+	// Verify vault path exists and is non-empty to prevent rsync --delete from wiping the working tree.
 	if _, err := os.Stat(s.vaultPath); err != nil {
 		return fmt.Errorf("vault path %q not accessible: %w", s.vaultPath, err)
+	}
+	entries, err := os.ReadDir(s.vaultPath)
+	if err != nil {
+		return fmt.Errorf("reading vault path %q: %w", s.vaultPath, err)
+	}
+	if len(entries) == 0 {
+		return fmt.Errorf("vault path %q is empty, skipping sync to prevent data loss", s.vaultPath)
 	}
 
 	// rsync vault to workDir, excluding .git and .obsidian.
@@ -190,7 +197,7 @@ func (s *Syncer) sync(ctx context.Context) error {
 			s.logger.Error("push conflict detected", "stderr", pushStderr)
 			if s.cfg.NotifyOnConflict {
 				msg := FormatConflictAlert(pushStderr, time.Now())
-				if notifyErr := s.notifier.SendMessage(ctx, msg); notifyErr != nil {
+				if notifyErr := s.notifier.SendMessage(syncCtx, msg); notifyErr != nil {
 					s.logger.Error("failed to send conflict notification", "error", notifyErr)
 				}
 			}
@@ -209,7 +216,7 @@ func (s *Syncer) sync(ctx context.Context) error {
 	s.logger.Info("push successful", "files_changed", pushFilesChanged)
 	if s.cfg.NotifyOnPush {
 		msg := FormatPushNotification(pushFilesChanged, pushStat, time.Now())
-		if notifyErr := s.notifier.SendMessage(ctx, msg); notifyErr != nil {
+		if notifyErr := s.notifier.SendMessage(syncCtx, msg); notifyErr != nil {
 			s.logger.Error("failed to send push notification", "error", notifyErr)
 		}
 	}
