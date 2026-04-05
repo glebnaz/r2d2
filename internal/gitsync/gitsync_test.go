@@ -51,14 +51,13 @@ func setupBareRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	bare := filepath.Join(dir, "remote.git")
-	runCmd(t, "", "git", "init", "--bare", bare)
+	runCmd(t, "", "git", "init", "--bare", "--initial-branch=main", bare)
 
 	// Create initial commit via a temp working copy.
 	tmp := filepath.Join(dir, "init-work")
 	os.MkdirAll(tmp, 0o755)
-	runCmd(t, tmp, "git", "init")
+	runCmd(t, tmp, "git", "init", "--initial-branch=main")
 	runCmd(t, tmp, "git", "remote", "add", "origin", bare)
-	runCmd(t, tmp, "git", "checkout", "-b", "main")
 	runCmd(t, tmp, "git", "config", "user.email", "test@test.local")
 	runCmd(t, tmp, "git", "config", "user.name", "Test")
 	os.WriteFile(filepath.Join(tmp, ".gitkeep"), []byte(""), 0o644)
@@ -211,7 +210,7 @@ func TestSync_WithChanges(t *testing.T) {
 
 	// Verify file was pushed to remote.
 	verifyDir := filepath.Join(t.TempDir(), "verify")
-	runCmd(t, "", "git", "clone", bare, verifyDir)
+	runCmd(t, "", "git", "clone", "--branch", "main", bare, verifyDir)
 	if _, err := os.Stat(filepath.Join(verifyDir, "notes.md")); os.IsNotExist(err) {
 		t.Fatal("notes.md not pushed to remote")
 	}
@@ -234,7 +233,7 @@ func TestSync_PushConflict(t *testing.T) {
 
 	// Push a conflicting change from another clone.
 	conflictDir := filepath.Join(t.TempDir(), "conflict")
-	runCmd(t, "", "git", "clone", bare, conflictDir)
+	runCmd(t, "", "git", "clone", "--branch", "main", bare, conflictDir)
 	runCmd(t, conflictDir, "git", "config", "user.email", "other@test.local")
 	runCmd(t, conflictDir, "git", "config", "user.name", "Other")
 	os.WriteFile(filepath.Join(conflictDir, "conflict.txt"), []byte("conflict"), 0o644)
