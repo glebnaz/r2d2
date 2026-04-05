@@ -23,7 +23,7 @@ func FormatConflictAlert(stderr string, timestamp time.Time) string {
 	var b strings.Builder
 	b.WriteString("🚨 *Git Sync — конфликт!*\n")
 	fmt.Fprintf(&b, "_%s_\n", timestamp.Format("02.01.2006 15:04"))
-	b.WriteString("\nНе удалось отправить изменения. Требуется ручное разрешение конфликта.\n")
+	b.WriteString("\nНе удалось отправить изменения — удалённая ветка обновилась. Локальный коммит сброшен, повтор при следующей синхронизации.\n")
 	if stderr = strings.TrimSpace(stderr); stderr != "" {
 		fmt.Fprintf(&b, "\n```\n%s\n```", stderr)
 	}

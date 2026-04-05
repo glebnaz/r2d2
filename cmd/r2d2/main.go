@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -116,13 +117,13 @@ func run() error {
 	if cfg.GitSync != nil && cfg.GitSync.Enabled {
 		syncer := gitsync.New(cfg.GitSync, cfg.VaultPath, sender, logger)
 		go func() {
-			if err := syncer.Run(ctx); err != nil && err != context.Canceled {
+			if err := syncer.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 				logger.Error("git sync error", "error", err)
 			}
 		}()
 	}
 
-	if err := sched.Run(ctx); err != nil && err != context.Canceled {
+	if err := sched.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		return fmt.Errorf("scheduler error: %w", err)
 	}
 

@@ -125,7 +125,7 @@ func Load(path string) (*Config, error) {
 			if gs.Branch == "" {
 				gs.Branch = "main"
 			}
-			if gs.PushIntervalMin == 0 {
+			if gs.PushIntervalMin < 1 {
 				gs.PushIntervalMin = 30
 			}
 			if gs.AuthorName == "" {

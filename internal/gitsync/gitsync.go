@@ -109,13 +109,18 @@ func (s *Syncer) ensureRepo(ctx context.Context) error {
 	return nil
 }
 
-// sync performs one sync cycle: rsync vault to workDir, stage, commit, push.
+// sync performs one sync cycle: fetch, rsync vault to workDir, stage, commit, push.
 func (s *Syncer) sync(ctx context.Context) error {
 	start := time.Now()
 	metrics.GitSyncsTotal.Inc()
 	defer func() {
 		metrics.GitSyncDuration.Observe(time.Since(start).Seconds())
 	}()
+
+	// Fetch latest remote state to keep origin/<branch> up to date.
+	if _, stderr, err := s.git(ctx, "fetch", "origin", s.cfg.Branch); err != nil {
+		return fmt.Errorf("git fetch: %s: %w", stderr, err)
+	}
 
 	// rsync vault to workDir, excluding .git and .obsidian.
 	rsyncCmd := exec.CommandContext(ctx, "rsync",
@@ -154,7 +159,6 @@ func (s *Syncer) sync(ctx context.Context) error {
 	// Commit.
 	commitMsg := fmt.Sprintf("vault sync: %d files changed\n\n%s", filesChanged, strings.TrimSpace(diffStat))
 	if _, stderr, err := s.git(ctx, "commit", "-m", commitMsg); err != nil {
-		metrics.GitPushErrors.Inc()
 		return fmt.Errorf("git commit: %s: %w", stderr, err)
 	}
 
@@ -202,8 +206,21 @@ func (s *Syncer) Run(ctx context.Context) error {
 		"interval_min", s.cfg.PushIntervalMin,
 	)
 
-	if err := s.ensureRepo(ctx); err != nil {
-		return fmt.Errorf("ensuring repo: %w", err)
+	const maxRetries = 3
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		if err := s.ensureRepo(ctx); err != nil {
+			if attempt == maxRetries {
+				return fmt.Errorf("ensuring repo after %d attempts: %w", maxRetries, err)
+			}
+			s.logger.Warn("ensureRepo failed, retrying", "attempt", attempt, "error", err)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(time.Duration(attempt*10) * time.Second):
+			}
+			continue
+		}
+		break
 	}
 
 	if err := s.sync(ctx); err != nil {

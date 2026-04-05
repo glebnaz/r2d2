@@ -55,7 +55,7 @@ func TestFormatConflictAlert_Full(t *testing.T) {
 		"конфликт",
 		"05.04.2026 14:30",
 		"Не удалось отправить изменения",
-		"ручное разрешение",
+		"Локальный коммит сброшен",
 		"non-fast-forward",
 	}
 	for _, want := range checks {
