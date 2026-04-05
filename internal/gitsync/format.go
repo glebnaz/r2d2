@@ -13,7 +13,12 @@ func FormatPushNotification(filesChanged int, summary string, timestamp time.Tim
 	fmt.Fprintf(&b, "_%s_\n", timestamp.Format("02.01.2006 15:04"))
 	fmt.Fprintf(&b, "\nФайлов изменено: %d\n", filesChanged)
 	if summary = strings.TrimSpace(summary); summary != "" {
-		fmt.Fprintf(&b, "\n```\n%s\n```", summary)
+		lines := strings.Split(summary, "\n")
+		const maxLines = 15
+		if len(lines) > maxLines {
+			lines = append(lines[:maxLines], fmt.Sprintf("... и ещё %d файлов", len(lines)-maxLines))
+		}
+		fmt.Fprintf(&b, "\n```\n%s\n```", strings.Join(lines, "\n"))
 	}
 	return b.String()
 }

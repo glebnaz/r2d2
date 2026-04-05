@@ -11,7 +11,8 @@ RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /r2d2 ./cmd/r2d2
 
 FROM alpine:3.21
 
-RUN apk add --no-cache ca-certificates tzdata git rsync openssh-client
+RUN apk add --no-cache ca-certificates tzdata git rsync openssh-client && \
+    git config --global --add safe.directory '*'
 
 COPY --from=builder /r2d2 /usr/local/bin/r2d2
 
