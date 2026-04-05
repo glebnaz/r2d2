@@ -8,17 +8,17 @@
 
 ## Docker образ
 
-Собирается автоматически через GitHub Actions при пуше в `obsidian-reminders` или `master`.
+Собирается автоматически через GitHub Actions при пуше в `master`.
 
 - Registry: `ghcr.io/glebnaz/r2d2`
 - Платформы: `linux/arm64`, `linux/amd64`
-- Тег по ветке: `ghcr.io/glebnaz/r2d2:obsidian-reminders`
+- Тег по ветке: `ghcr.io/glebnaz/r2d2:master`
 
 ## docker-compose.yaml
 
 ```yaml
 r2d2:
-  image: ghcr.io/glebnaz/r2d2:obsidian-reminders
+  image: ghcr.io/glebnaz/r2d2:master
   container_name: r2d2
   dns:
     - 1.1.1.1

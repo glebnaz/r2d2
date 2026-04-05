@@ -41,10 +41,10 @@ go build -o r2d2 ./cmd/r2d2
 ## Docker
 
 ```bash
-docker pull ghcr.io/glebnaz/r2d2:obsidian-reminders
+docker pull ghcr.io/glebnaz/r2d2:master
 docker run -v /path/to/config.json:/etc/r2d2/config.json:ro \
            -v /path/to/vault:/vault:ro \
-           ghcr.io/glebnaz/r2d2:obsidian-reminders \
+           ghcr.io/glebnaz/r2d2:master \
            --config /etc/r2d2/config.json
 ```
 

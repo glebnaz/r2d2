@@ -38,7 +38,7 @@ golangci-lint run
 ```bash
 docker build -t r2d2 .
 # Multi-arch build happens via GH Actions (.github/workflows/docker.yml)
-# Image: ghcr.io/glebnaz/r2d2:obsidian-reminders
+# Image: ghcr.io/glebnaz/r2d2:master
 ```
 
 ## Run locally
