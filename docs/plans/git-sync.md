@@ -22,15 +22,15 @@ Add a new feature to R2D2 that periodically pushes Obsidian vault changes to a G
 - [x] Mark completed
 
 ### Task 3: Core gitsync package — Syncer with Run/sync/ensureRepo
-- [ ] Create `internal/gitsync/gitsync.go` with `Notifier` interface, `Syncer` struct, and `New()` constructor
-- [ ] Implement `ensureRepo(ctx)`: clone if workDir empty, verify remote + fetch if exists
-- [ ] Implement `git(ctx, args...)` helper: exec git commands in workDir with author env vars
-- [ ] Implement `sync(ctx)`: rsync vault→workDir, check for changes, stage, build commit message from `git diff --cached --stat`, commit, push
-- [ ] Implement `Run(ctx)`: ensureRepo on startup, then ticker loop calling sync, return on ctx cancel
-- [ ] Handle push conflicts: detect "non-fast-forward"/"rejected" in stderr, send urgent notification, increment conflict metric
-- [ ] Instrument with Prometheus metrics (syncs total, pushes, errors, conflicts, duration, files changed)
-- [ ] Add tests (no changes skip, with changes commit, push conflict detection, notifications enabled/disabled, ensureRepo clone/existing)
-- [ ] Mark completed
+- [x] Create `internal/gitsync/gitsync.go` with `Notifier` interface, `Syncer` struct, and `New()` constructor
+- [x] Implement `ensureRepo(ctx)`: clone if workDir empty, verify remote + fetch if exists
+- [x] Implement `git(ctx, args...)` helper: exec git commands in workDir with author env vars
+- [x] Implement `sync(ctx)`: rsync vault→workDir, check for changes, stage, build commit message from `git diff --cached --stat`, commit, push
+- [x] Implement `Run(ctx)`: ensureRepo on startup, then ticker loop calling sync, return on ctx cancel
+- [x] Handle push conflicts: detect "non-fast-forward"/"rejected" in stderr, send urgent notification, increment conflict metric
+- [x] Instrument with Prometheus metrics (syncs total, pushes, errors, conflicts, duration, files changed)
+- [x] Add tests (no changes skip, with changes commit, push conflict detection, notifications enabled/disabled, ensureRepo clone/existing)
+- [x] Mark completed
 
 ### Task 4: Message formatting — Russian notifications with emoji
 - [ ] Create `internal/gitsync/format.go` with `FormatPushNotification(filesChanged int, summary string, timestamp time.Time) string` — outputs `📤 Git Sync` message in Russian
