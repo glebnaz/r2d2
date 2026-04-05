@@ -40,6 +40,8 @@ type Config struct {
 	MorningHour         int            `json:"morning_hour"`
 	ScanIntervalMinutes int            `json:"scan_interval_minutes"`
 	ReminderStatuses    []string       `json:"reminder_statuses"`
+	Latitude            float64        `json:"latitude"`
+	Longitude           float64        `json:"longitude"`
 	GitSync             *GitSyncConfig `json:"git_sync,omitempty"`
 }
 
@@ -52,6 +54,8 @@ type configRaw struct {
 	MorningHour         int          `json:"morning_hour"`
 	ScanIntervalMinutes int          `json:"scan_interval_minutes"`
 	ReminderStatuses    []string     `json:"reminder_statuses"`
+	Latitude            float64      `json:"latitude"`
+	Longitude           float64      `json:"longitude"`
 	GitSync             *gitSyncRaw  `json:"git_sync,omitempty"`
 }
 
@@ -92,6 +96,8 @@ func Load(path string) (*Config, error) {
 		MorningHour:         raw.MorningHour,
 		ScanIntervalMinutes: raw.ScanIntervalMinutes,
 		ReminderStatuses:    raw.ReminderStatuses,
+		Latitude:            raw.Latitude,
+		Longitude:           raw.Longitude,
 	}
 
 	if cfg.VaultPath == "" {

@@ -77,6 +77,9 @@ func run() error {
 
 	// Build digest engine with collectors.
 	engine := digest.NewEngine()
+	if cfg.Latitude != 0 || cfg.Longitude != 0 {
+		engine.Register(digest.NewWeatherCollector(cfg.Latitude, cfg.Longitude, cfg.Timezone))
+	}
 	engine.Register(digest.NewTasksCollector(scanFn, loc))
 
 	sched := scheduler.New(
