@@ -141,10 +141,11 @@ func (s *Syncer) sync(ctx context.Context) error {
 		return fmt.Errorf("vault path %q is empty, skipping sync to prevent data loss", s.vaultPath)
 	}
 
-	// rsync vault to workDir, excluding .git and .obsidian.
+	// rsync vault to workDir, excluding .git, .obsidian, and repo-only files.
 	rsyncCmd := exec.CommandContext(syncCtx, "rsync",
 		"-a", "--delete",
 		"--exclude", ".git",
+		"--exclude", ".gitignore",
 		"--exclude", ".obsidian",
 		s.vaultPath+"/",
 		s.cfg.WorkDir+"/",
