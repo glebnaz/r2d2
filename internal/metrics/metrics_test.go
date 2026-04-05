@@ -1,10 +1,13 @@
 package metrics
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 func scrapeBody(t *testing.T) string {
@@ -37,22 +40,23 @@ func TestGitSyncMetricsRegistered(t *testing.T) {
 }
 
 func TestGitSyncCounterIncrement(t *testing.T) {
-	GitSyncsTotal.Inc()
-	GitPushesTotal.Inc()
-	GitPushErrors.Inc()
-	GitConflicts.Inc()
+	counters := []struct {
+		name    string
+		counter interface{ Inc() }
+		getter  func() float64
+	}{
+		{"r2d2_git_syncs_total", GitSyncsTotal, func() float64 { return testutil.ToFloat64(GitSyncsTotal) }},
+		{"r2d2_git_pushes_total", GitPushesTotal, func() float64 { return testutil.ToFloat64(GitPushesTotal) }},
+		{"r2d2_git_push_errors_total", GitPushErrors, func() float64 { return testutil.ToFloat64(GitPushErrors) }},
+		{"r2d2_git_conflicts_total", GitConflicts, func() float64 { return testutil.ToFloat64(GitConflicts) }},
+	}
 
-	body := scrapeBody(t)
-
-	// After Inc(), counters should be >= 1.
-	for _, name := range []string{
-		"r2d2_git_syncs_total",
-		"r2d2_git_pushes_total",
-		"r2d2_git_push_errors_total",
-		"r2d2_git_conflicts_total",
-	} {
-		if !strings.Contains(body, name) {
-			t.Errorf("metric %q not found after increment", name)
+	for _, c := range counters {
+		before := c.getter()
+		c.counter.Inc()
+		after := c.getter()
+		if after != before+1 {
+			t.Errorf("%s: expected value to increase by 1 (before=%v, after=%v)", c.name, before, after)
 		}
 	}
 }
@@ -69,10 +73,15 @@ func TestGitSyncDurationObserve(t *testing.T) {
 func TestGitFilesChangedGauge(t *testing.T) {
 	GitFilesChanged.Set(42)
 
+	val := testutil.ToFloat64(GitFilesChanged)
+	if val != 42 {
+		t.Errorf("gauge = %v, want 42", val)
+	}
+
+	// Also verify it appears in scraped output.
 	body := scrapeBody(t)
-	if !strings.Contains(body, "r2d2_git_files_changed_last 42") {
-		t.Errorf("gauge not set to 42; body snippet: %s",
-			body[strings.Index(body, "r2d2_git_files_changed_last"):
-				strings.Index(body, "r2d2_git_files_changed_last")+80])
+	expected := fmt.Sprintf("r2d2_git_files_changed_last %v", val)
+	if !strings.Contains(body, expected) {
+		t.Errorf("gauge not found in /metrics output: %s", body)
 	}
 }

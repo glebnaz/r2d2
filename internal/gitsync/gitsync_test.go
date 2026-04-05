@@ -21,8 +21,6 @@ func (m *mockNotifier) SendMessage(_ context.Context, text string) error {
 	return nil
 }
 
-func boolPtr(b bool) *bool { return &b }
-
 // requireTools skips the test if git or rsync are not available.
 func requireTools(t *testing.T) {
 	t.Helper()
@@ -84,8 +82,8 @@ func newTestSyncer(t *testing.T, bareRepo, vaultPath string, notifier *mockNotif
 		PushIntervalMin:  1,
 		AuthorName:       "Test Bot",
 		AuthorEmail:      "test@bot.local",
-		NotifyOnPush:     boolPtr(true),
-		NotifyOnConflict: boolPtr(true),
+		NotifyOnPush:     true,
+		NotifyOnConflict: true,
 	}
 
 	return New(cfg, vaultPath, notifier, slog.Default())
@@ -284,8 +282,8 @@ func TestSync_NotificationsDisabled(t *testing.T) {
 		PushIntervalMin:  1,
 		AuthorName:       "Test Bot",
 		AuthorEmail:      "test@bot.local",
-		NotifyOnPush:     boolPtr(false),
-		NotifyOnConflict: boolPtr(false),
+		NotifyOnPush:     false,
+		NotifyOnConflict: false,
 	}
 	syncer := New(cfg, vault, notifier, slog.Default())
 

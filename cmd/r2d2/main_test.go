@@ -73,13 +73,10 @@ func TestDryRunWithSampleVault(t *testing.T) {
 	out, _ = cmd.CombinedOutput()
 	output := string(out)
 
-	// In dry-run mode with a task due today, the bot should print a digest.
-	// The scheduler runs continuously, so we expect it to be killed by the timeout.
-	// Check stderr+stdout for signs of operation.
+	// The bot should start and log startup message. The scheduler runs
+	// continuously, so we expect it to be killed by the timeout.
 	if !strings.Contains(output, "r2d2 starting") && !strings.Contains(output, "DRY RUN") && !strings.Contains(output, "scheduler starting") {
-		t.Logf("output: %s", output)
-		// The bot may just log to stderr and print digest to stdout.
-		// As long as it starts and doesn't crash, we're good.
+		t.Errorf("expected startup or dry-run output, got: %s", output)
 	}
 }
 
@@ -135,14 +132,8 @@ func TestDryRunWithGitSyncEnabled(t *testing.T) {
 	output := string(out)
 
 	// The bot should start successfully even though git sync will fail to clone.
-	// We verify it started by checking for the startup log message.
 	if !strings.Contains(output, "r2d2 starting") && !strings.Contains(output, "scheduler starting") {
-		t.Logf("output: %s", output)
-	}
-
-	// Verify git sync was attempted (should log an error about the clone).
-	if !strings.Contains(output, "git sync") && !strings.Contains(output, "git_sync") {
-		t.Logf("note: git sync log not found in output (may be on stderr): %s", output)
+		t.Errorf("expected startup log, got: %s", output)
 	}
 }
 

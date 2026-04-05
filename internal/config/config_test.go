@@ -150,10 +150,10 @@ func TestGitSyncDefaults(t *testing.T) {
 	if gs.AuthorEmail != "r2d2@bot.local" {
 		t.Errorf("author_email = %q, want r2d2@bot.local", gs.AuthorEmail)
 	}
-	if gs.NotifyOnPush == nil || !*gs.NotifyOnPush {
+	if !gs.NotifyOnPush {
 		t.Error("notify_on_push should default to true")
 	}
-	if gs.NotifyOnConflict == nil || !*gs.NotifyOnConflict {
+	if !gs.NotifyOnConflict {
 		t.Error("notify_on_conflict should default to true")
 	}
 }
@@ -195,10 +195,10 @@ func TestGitSyncOverrideDefaults(t *testing.T) {
 	if gs.AuthorEmail != "custom@example.com" {
 		t.Errorf("author_email = %q, want custom@example.com", gs.AuthorEmail)
 	}
-	if gs.NotifyOnPush == nil || *gs.NotifyOnPush {
+	if gs.NotifyOnPush {
 		t.Error("notify_on_push should be false")
 	}
-	if gs.NotifyOnConflict == nil || *gs.NotifyOnConflict {
+	if gs.NotifyOnConflict {
 		t.Error("notify_on_conflict should be false")
 	}
 }

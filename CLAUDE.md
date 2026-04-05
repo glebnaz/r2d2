@@ -105,4 +105,4 @@ Prometheus metrics on `:9182/metrics`. Key metrics:
 
 ## Deployment
 
-Runs as Docker container on Raspberry Pi (arm64). Defined in `home-server` repo's `docker-compose.yaml`. Vault is mounted read-only from Obsidian Headless sync directory.
+Runs as Docker container on Raspberry Pi (arm64). Defined in `home-server` repo's `docker-compose.yaml`. Vault is mounted read-only from Obsidian Headless sync directory. Git sync requires a `r2d2-git-vault` Docker volume for the working tree. The Docker image includes `git`, `rsync`, and `openssh-client`.

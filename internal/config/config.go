@@ -15,6 +15,19 @@ type GitSyncConfig struct {
 	PushIntervalMin  int    `json:"push_interval_min"`
 	AuthorName       string `json:"author_name"`
 	AuthorEmail      string `json:"author_email"`
+	NotifyOnPush     bool   `json:"notify_on_push"`
+	NotifyOnConflict bool   `json:"notify_on_conflict"`
+}
+
+// gitSyncRaw is used for JSON unmarshaling to distinguish "not set" from "set to false".
+type gitSyncRaw struct {
+	Enabled          bool   `json:"enabled"`
+	RepoURL          string `json:"repo_url"`
+	Branch           string `json:"branch"`
+	WorkDir          string `json:"work_dir"`
+	PushIntervalMin  int    `json:"push_interval_min"`
+	AuthorName       string `json:"author_name"`
+	AuthorEmail      string `json:"author_email"`
 	NotifyOnPush     *bool  `json:"notify_on_push,omitempty"`
 	NotifyOnConflict *bool  `json:"notify_on_conflict,omitempty"`
 }
@@ -28,6 +41,18 @@ type Config struct {
 	ScanIntervalMinutes int            `json:"scan_interval_minutes"`
 	ReminderStatuses    []string       `json:"reminder_statuses"`
 	GitSync             *GitSyncConfig `json:"git_sync,omitempty"`
+}
+
+// configRaw is used for JSON unmarshaling with *bool fields.
+type configRaw struct {
+	VaultPath           string       `json:"vault_path"`
+	TelegramToken       string       `json:"telegram_token"`
+	TelegramChatID      int64        `json:"telegram_chat_id"`
+	Timezone            string       `json:"timezone"`
+	MorningHour         int          `json:"morning_hour"`
+	ScanIntervalMinutes int          `json:"scan_interval_minutes"`
+	ReminderStatuses    []string     `json:"reminder_statuses"`
+	GitSync             *gitSyncRaw  `json:"git_sync,omitempty"`
 }
 
 func defaultConfigPath() string {
@@ -48,15 +73,25 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("reading config file %s: %w", path, err)
 	}
 
-	cfg := &Config{
+	raw := &configRaw{
 		Timezone:           "Europe/Moscow",
 		MorningHour:        9,
 		ScanIntervalMinutes: 5,
 		ReminderStatuses:   []string{"todo", "in-progress", "block"},
 	}
 
-	if err := json.Unmarshal(data, cfg); err != nil {
+	if err := json.Unmarshal(data, raw); err != nil {
 		return nil, fmt.Errorf("parsing config file: %w", err)
+	}
+
+	cfg := &Config{
+		VaultPath:           raw.VaultPath,
+		TelegramToken:       raw.TelegramToken,
+		TelegramChatID:      raw.TelegramChatID,
+		Timezone:            raw.Timezone,
+		MorningHour:         raw.MorningHour,
+		ScanIntervalMinutes: raw.ScanIntervalMinutes,
+		ReminderStatuses:    raw.ReminderStatuses,
 	}
 
 	if cfg.VaultPath == "" {
@@ -69,33 +104,51 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("telegram_chat_id is required")
 	}
 
-	if cfg.GitSync != nil && cfg.GitSync.Enabled {
-		if cfg.GitSync.RepoURL == "" {
-			return nil, fmt.Errorf("git_sync.repo_url is required when git sync is enabled")
+	if raw.GitSync != nil {
+		gs := &GitSyncConfig{
+			Enabled:     raw.GitSync.Enabled,
+			RepoURL:     raw.GitSync.RepoURL,
+			Branch:      raw.GitSync.Branch,
+			WorkDir:     raw.GitSync.WorkDir,
+			PushIntervalMin: raw.GitSync.PushIntervalMin,
+			AuthorName:  raw.GitSync.AuthorName,
+			AuthorEmail: raw.GitSync.AuthorEmail,
 		}
-		if cfg.GitSync.WorkDir == "" {
-			return nil, fmt.Errorf("git_sync.work_dir is required when git sync is enabled")
+
+		if gs.Enabled {
+			if gs.RepoURL == "" {
+				return nil, fmt.Errorf("git_sync.repo_url is required when git sync is enabled")
+			}
+			if gs.WorkDir == "" {
+				return nil, fmt.Errorf("git_sync.work_dir is required when git sync is enabled")
+			}
+			if gs.Branch == "" {
+				gs.Branch = "main"
+			}
+			if gs.PushIntervalMin == 0 {
+				gs.PushIntervalMin = 30
+			}
+			if gs.AuthorName == "" {
+				gs.AuthorName = "R2D2 Bot"
+			}
+			if gs.AuthorEmail == "" {
+				gs.AuthorEmail = "r2d2@bot.local"
+			}
 		}
-		if cfg.GitSync.Branch == "" {
-			cfg.GitSync.Branch = "main"
+
+		// Default notify flags to true if not explicitly set.
+		if raw.GitSync.NotifyOnPush == nil {
+			gs.NotifyOnPush = true
+		} else {
+			gs.NotifyOnPush = *raw.GitSync.NotifyOnPush
 		}
-		if cfg.GitSync.PushIntervalMin == 0 {
-			cfg.GitSync.PushIntervalMin = 30
+		if raw.GitSync.NotifyOnConflict == nil {
+			gs.NotifyOnConflict = true
+		} else {
+			gs.NotifyOnConflict = *raw.GitSync.NotifyOnConflict
 		}
-		if cfg.GitSync.AuthorName == "" {
-			cfg.GitSync.AuthorName = "R2D2 Bot"
-		}
-		if cfg.GitSync.AuthorEmail == "" {
-			cfg.GitSync.AuthorEmail = "r2d2@bot.local"
-		}
-		if cfg.GitSync.NotifyOnPush == nil {
-			t := true
-			cfg.GitSync.NotifyOnPush = &t
-		}
-		if cfg.GitSync.NotifyOnConflict == nil {
-			t := true
-			cfg.GitSync.NotifyOnConflict = &t
-		}
+
+		cfg.GitSync = gs
 	}
 
 	return cfg, nil

@@ -41,16 +41,21 @@ func New(cfg *config.GitSyncConfig, vaultPath string, notifier Notifier, logger 
 	}
 }
 
-// git runs a git command in the work directory with configured author env vars.
-func (s *Syncer) git(ctx context.Context, args ...string) (string, string, error) {
-	cmd := exec.CommandContext(ctx, "git", args...)
-	cmd.Dir = s.cfg.WorkDir
-	cmd.Env = append(os.Environ(),
+// gitEnv returns the environment variables for git commands.
+func (s *Syncer) gitEnv() []string {
+	return append(os.Environ(),
 		"GIT_AUTHOR_NAME="+s.cfg.AuthorName,
 		"GIT_AUTHOR_EMAIL="+s.cfg.AuthorEmail,
 		"GIT_COMMITTER_NAME="+s.cfg.AuthorName,
 		"GIT_COMMITTER_EMAIL="+s.cfg.AuthorEmail,
 	)
+}
+
+// git runs a git command in the work directory with configured author env vars.
+func (s *Syncer) git(ctx context.Context, args ...string) (string, string, error) {
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = s.cfg.WorkDir
+	cmd.Env = s.gitEnv()
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -64,18 +69,17 @@ func (s *Syncer) git(ctx context.Context, args ...string) (string, string, error
 // or verifies the remote and fetches if it already exists.
 func (s *Syncer) ensureRepo(ctx context.Context) error {
 	gitDir := filepath.Join(s.cfg.WorkDir, ".git")
-	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+	if _, err := os.Stat(gitDir); err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("checking git directory: %w", err)
+		}
 		s.logger.Info("cloning repository", "url", s.cfg.RepoURL, "branch", s.cfg.Branch)
 		cmd := exec.CommandContext(ctx, "git", "clone", "--branch", s.cfg.Branch, s.cfg.RepoURL, s.cfg.WorkDir)
-		cmd.Env = append(os.Environ(),
-			"GIT_AUTHOR_NAME="+s.cfg.AuthorName,
-			"GIT_AUTHOR_EMAIL="+s.cfg.AuthorEmail,
-			"GIT_COMMITTER_NAME="+s.cfg.AuthorName,
-			"GIT_COMMITTER_EMAIL="+s.cfg.AuthorEmail,
-		)
+		cmd.Env = s.gitEnv()
 		var stderr bytes.Buffer
 		cmd.Stderr = &stderr
 		if err := cmd.Run(); err != nil {
+			os.RemoveAll(s.cfg.WorkDir)
 			return fmt.Errorf("cloning repo: %s: %w", stderr.String(), err)
 		}
 		return nil
@@ -109,6 +113,9 @@ func (s *Syncer) ensureRepo(ctx context.Context) error {
 func (s *Syncer) sync(ctx context.Context) error {
 	start := time.Now()
 	metrics.GitSyncsTotal.Inc()
+	defer func() {
+		metrics.GitSyncDuration.Observe(time.Since(start).Seconds())
+	}()
 
 	// rsync vault to workDir, excluding .git and .obsidian.
 	rsyncCmd := exec.CommandContext(ctx, "rsync",
@@ -121,15 +128,11 @@ func (s *Syncer) sync(ctx context.Context) error {
 	var rsyncStderr bytes.Buffer
 	rsyncCmd.Stderr = &rsyncStderr
 	if err := rsyncCmd.Run(); err != nil {
-		metrics.GitPushErrors.Inc()
-		metrics.GitSyncDuration.Observe(time.Since(start).Seconds())
 		return fmt.Errorf("rsync: %s: %w", rsyncStderr.String(), err)
 	}
 
 	// Stage all changes.
 	if _, stderr, err := s.git(ctx, "add", "-A"); err != nil {
-		metrics.GitPushErrors.Inc()
-		metrics.GitSyncDuration.Observe(time.Since(start).Seconds())
 		return fmt.Errorf("git add: %s: %w", stderr, err)
 	}
 
@@ -137,7 +140,6 @@ func (s *Syncer) sync(ctx context.Context) error {
 	if _, _, err := s.git(ctx, "diff", "--cached", "--quiet"); err == nil {
 		s.logger.Info("no changes to sync")
 		metrics.GitFilesChanged.Set(0)
-		metrics.GitSyncDuration.Observe(time.Since(start).Seconds())
 		return nil
 	}
 
@@ -153,7 +155,6 @@ func (s *Syncer) sync(ctx context.Context) error {
 	commitMsg := fmt.Sprintf("vault sync: %d files changed\n\n%s", filesChanged, strings.TrimSpace(diffStat))
 	if _, stderr, err := s.git(ctx, "commit", "-m", commitMsg); err != nil {
 		metrics.GitPushErrors.Inc()
-		metrics.GitSyncDuration.Observe(time.Since(start).Seconds())
 		return fmt.Errorf("git commit: %s: %w", stderr, err)
 	}
 
@@ -162,26 +163,28 @@ func (s *Syncer) sync(ctx context.Context) error {
 	if pushErr != nil {
 		if isConflict(pushStderr) {
 			metrics.GitConflicts.Inc()
+			metrics.GitPushErrors.Inc()
 			s.logger.Error("push conflict detected", "stderr", pushStderr)
-			if s.cfg.NotifyOnConflict != nil && *s.cfg.NotifyOnConflict {
+			if s.cfg.NotifyOnConflict {
 				msg := FormatConflictAlert(pushStderr, time.Now())
 				if notifyErr := s.notifier.SendMessage(ctx, msg); notifyErr != nil {
 					s.logger.Error("failed to send conflict notification", "error", notifyErr)
 				}
 			}
-			metrics.GitSyncDuration.Observe(time.Since(start).Seconds())
+			// Reset local branch to match remote to prevent permanent divergence.
+			if _, errOut, resetErr := s.git(ctx, "reset", "--hard", "origin/"+s.cfg.Branch); resetErr != nil {
+				s.logger.Error("failed to reset after conflict", "error", resetErr, "stderr", errOut)
+			}
 			return fmt.Errorf("push conflict: %s", pushStderr)
 		}
 		metrics.GitPushErrors.Inc()
-		metrics.GitSyncDuration.Observe(time.Since(start).Seconds())
 		return fmt.Errorf("git push: %s: %w", pushStderr, pushErr)
 	}
 
 	metrics.GitPushesTotal.Inc()
-	metrics.GitSyncDuration.Observe(time.Since(start).Seconds())
 
 	s.logger.Info("push successful", "files_changed", filesChanged)
-	if s.cfg.NotifyOnPush != nil && *s.cfg.NotifyOnPush {
+	if s.cfg.NotifyOnPush {
 		msg := FormatPushNotification(filesChanged, diffStat, time.Now())
 		if notifyErr := s.notifier.SendMessage(ctx, msg); notifyErr != nil {
 			s.logger.Error("failed to send push notification", "error", notifyErr)
