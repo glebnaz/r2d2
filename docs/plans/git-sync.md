@@ -33,10 +33,10 @@ Add a new feature to R2D2 that periodically pushes Obsidian vault changes to a G
 - [x] Mark completed
 
 ### Task 4: Message formatting — Russian notifications with emoji
-- [ ] Create `internal/gitsync/format.go` with `FormatPushNotification(filesChanged int, summary string, timestamp time.Time) string` — outputs `📤 Git Sync` message in Russian
-- [ ] Add `FormatConflictAlert(stderr string, timestamp time.Time) string` — outputs `🚨 Git Sync — конфликт!` urgent message
-- [ ] Add tests for both formatters
-- [ ] Mark completed
+- [x] Create `internal/gitsync/format.go` with `FormatPushNotification(filesChanged int, summary string, timestamp time.Time) string` — outputs `📤 Git Sync` message in Russian
+- [x] Add `FormatConflictAlert(stderr string, timestamp time.Time) string` — outputs `🚨 Git Sync — конфликт!` urgent message
+- [x] Add tests for both formatters
+- [x] Mark completed
 
 ### Task 5: Wire into main.go and update Dockerfile
 - [ ] Add conditional gitsync startup in `cmd/r2d2/main.go`: if `cfg.GitSync != nil && cfg.GitSync.Enabled`, create Syncer and run in goroutine with shared ctx

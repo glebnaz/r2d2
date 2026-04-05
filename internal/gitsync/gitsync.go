@@ -164,7 +164,7 @@ func (s *Syncer) sync(ctx context.Context) error {
 			metrics.GitConflicts.Inc()
 			s.logger.Error("push conflict detected", "stderr", pushStderr)
 			if s.cfg.NotifyOnConflict != nil && *s.cfg.NotifyOnConflict {
-				msg := fmt.Sprintf("🚨 Git Sync — конфликт!\n\n%s", pushStderr)
+				msg := FormatConflictAlert(pushStderr, time.Now())
 				if notifyErr := s.notifier.SendMessage(ctx, msg); notifyErr != nil {
 					s.logger.Error("failed to send conflict notification", "error", notifyErr)
 				}
@@ -182,7 +182,7 @@ func (s *Syncer) sync(ctx context.Context) error {
 
 	s.logger.Info("push successful", "files_changed", filesChanged)
 	if s.cfg.NotifyOnPush != nil && *s.cfg.NotifyOnPush {
-		msg := fmt.Sprintf("📤 Git Sync\n\nФайлов изменено: %d\n\n%s", filesChanged, strings.TrimSpace(diffStat))
+		msg := FormatPushNotification(filesChanged, diffStat, time.Now())
 		if notifyErr := s.notifier.SendMessage(ctx, msg); notifyErr != nil {
 			s.logger.Error("failed to send push notification", "error", notifyErr)
 		}
